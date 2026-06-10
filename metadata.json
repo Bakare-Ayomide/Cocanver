@@ -1,0 +1,6 @@
+{
+  "name": "Canvas2Code",
+  "description": "Transform screenshots and mockups into interactive visual applications with state management, custom actions, multi-click workflows, and code generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
