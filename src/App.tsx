@@ -7,7 +7,7 @@ import PreviewMode from "./components/PreviewMode";
 import CodeGenerator from "./components/CodeGenerator";
 import { PRESET_TEMPLATES } from "./components/PresetTemplates";
 import { 
-  ArrowLeft, Upload, FileImage, Sparkles, Layout, Compass, 
+  ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Upload, FileImage, Sparkles, Layout, Compass, 
   Trash2, Copy, Move, Maximize, ZoomIn, ZoomOut, Grid, AlignJustify, 
   Play, Code2, AlertTriangle, HelpCircle, Eye, EyeOff, Save, KeyRound, Check, X, Globe, RefreshCw
 } from "lucide-react";
@@ -680,6 +680,173 @@ export default function App() {
     setResizingElementId(null);
   };
 
+  const handleElementTouchStart = (e: React.TouchEvent, el: CanvasElement) => {
+    if (el.locked) return;
+    e.stopPropagation();
+    setSelectedElementId(el.id);
+    setDraggedElementId(el.id);
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect && e.touches.length > 0) {
+      const touch = e.touches[0];
+      const posX = ((touch.clientX - rect.left) / rect.width) * 100;
+      const posY = ((touch.clientY - rect.top) / rect.height) * 100;
+      setDragOffset({
+        x: posX - el.x,
+        y: posY - el.y,
+      });
+    }
+  };
+
+  const handleResizeTouchStart = (e: React.TouchEvent, el: CanvasElement) => {
+    if (el.locked) return;
+    e.stopPropagation();
+    setResizingElementId(el.id);
+    setResizeStartSize({
+      width: el.width,
+      height: el.height,
+      x: el.x,
+      y: el.y,
+    });
+    if (e.touches.length > 0) {
+      setResizeStartCursor({
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      });
+    }
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent) => {
+    if (!draggedElementId && !resizingElementId) return;
+    
+    // Prevent screen scrolling when dragging elements inside active canvas viewport
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    if (draggedElementId) {
+      const el = getActivePage()?.elements.find((item) => item.id === draggedElementId);
+      if (!el || el.locked) return;
+
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        const mouseX = ((touch.clientX - rect.left) / rect.width) * 100;
+        const mouseY = ((touch.clientY - rect.top) / rect.height) * 100;
+
+        let targetX = mouseX - dragOffset.x;
+        let targetY = mouseY - dragOffset.y;
+
+        if (snapToGrid) {
+          targetX = Math.round(targetX * 2) / 2;
+          targetY = Math.round(targetY * 2) / 2;
+        }
+
+        targetX = Math.max(0, Math.min(100 - el.width, targetX));
+        targetY = Math.max(0, Math.min(100 - el.height, targetY));
+
+        updateActivePageElements((prev) =>
+          prev.map((item) => (item.id === draggedElementId ? { ...item, x: targetX, y: targetY } : item))
+        );
+      }
+    } else if (resizingElementId) {
+      const el = getActivePage()?.elements.find((item) => item.id === resizingElementId);
+      if (!el || el.locked) return;
+
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaX = ((touch.clientX - resizeStartCursor.x) / rect.width) * 100;
+        const deltaY = ((touch.clientY - resizeStartCursor.y) / rect.height) * 100;
+
+        let nextWidth = resizeStartSize.width + deltaX;
+        let nextHeight = resizeStartSize.height + deltaY;
+
+        if (snapToGrid) {
+          nextWidth = Math.round(nextWidth * 2) / 2;
+          nextHeight = Math.round(nextHeight * 2) / 2;
+        }
+
+        nextWidth = Math.max(2, Math.min(100 - resizeStartSize.x, nextWidth));
+        nextHeight = Math.max(1, Math.min(100 - resizeStartSize.y, nextHeight));
+
+        updateActivePageElements((prev) =>
+          prev.map((item) => (item.id === resizingElementId ? { ...item, width: nextWidth, height: nextHeight } : item))
+        );
+      }
+    }
+  };
+
+  const handleCanvasTouchEnd = () => {
+    setDraggedElementId(null);
+    setResizingElementId(null);
+  };
+
+  // Keyboard nudge listener for selected elements
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedElementId) return;
+
+      // Do not nudge if the user is typing in form controls
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.getAttribute("contenteditable") === "true")
+      ) {
+        return;
+      }
+
+      const page = getActivePage();
+      if (!page) return;
+
+      const element = page.elements.find((el) => el.id === selectedElementId);
+      if (!element || element.locked) return;
+
+      let nudgeX = 0;
+      let nudgeY = 0;
+      const step = e.shiftKey ? 2.5 : 0.5; // shift speeds up movement rate
+
+      if (e.key === "ArrowUp") {
+        nudgeY = -step;
+        e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        nudgeY = step;
+        e.preventDefault();
+      } else if (e.key === "ArrowLeft") {
+        nudgeX = -step;
+        e.preventDefault();
+      } else if (e.key === "ArrowRight") {
+        nudgeX = step;
+        e.preventDefault();
+      }
+
+      if (nudgeX !== 0 || nudgeY !== 0) {
+        let nextX = element.x + nudgeX;
+        let nextY = element.y + nudgeY;
+
+        if (snapToGrid) {
+          nextX = Math.round(nextX * 2) / 2;
+          nextY = Math.round(nextY * 2) / 2;
+        }
+
+        nextX = Math.max(0, Math.min(100 - element.width, nextX));
+        nextY = Math.max(0, Math.min(100 - element.height, nextY));
+
+        updateActivePageElements((prev) =>
+          prev.map((item) => (item.id === selectedElementId ? { ...item, x: nextX, y: nextY } : item))
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedElementId, snapToGrid, activeProject]);
+
   // Multimodal Gemini vision pipeline
   const handleAIScan = async () => {
     const activePage = getActivePage();
@@ -1216,6 +1383,9 @@ export default function App() {
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
                 onMouseLeave={handleCanvasMouseUp}
+                onTouchMove={handleCanvasTouchMove}
+                onTouchEnd={handleCanvasTouchEnd}
+                onTouchCancel={handleCanvasTouchEnd}
                 style={{
                   width: `${canvasDimensions.width}px`,
                   height: `${canvasDimensions.height}px`,
@@ -1223,7 +1393,7 @@ export default function App() {
                   transformOrigin: "center center",
                   contentVisibility: "auto",
                 }}
-                className="relative bg-white border border-slate-205 rounded-xl shadow-xl transition-all overflow-hidden flex-shrink-0"
+                className="relative bg-white border border-slate-205 rounded-xl shadow-xl transition-all overflow-hidden flex-shrink-0 select-none touch-none"
                 id="active-editor-canvas"
               >
                 {activePage?.backgroundImage ? (
@@ -1260,6 +1430,7 @@ export default function App() {
                     <div
                       key={el.id}
                       onMouseDown={(e) => handleElementDragStart(e, el)}
+                      onTouchStart={(e) => handleElementTouchStart(e, el)}
                       style={{
                         left: `${el.x}%`,
                         top: `${el.y}%`,
@@ -1268,9 +1439,9 @@ export default function App() {
                         zIndex: el.zIndex || 10,
                         contentVisibility: "auto",
                       }}
-                      className={`absolute rounded cursor-move transition-all flex items-center justify-between pointer-events-auto ${
+                      className={`absolute rounded cursor-move transition-all flex items-center justify-between pointer-events-auto select-none touch-none ${
                         isSelected
-                          ? "ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 bg-blue-500/15 border border-blue-400"
+                          ? "ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 bg-blue-500/15 border border-blue-400 z-30"
                           : el.styles.invisibleOnScreen
                           ? "border border-dashed border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10"
                           : el.styles.transparent
@@ -1319,7 +1490,8 @@ export default function App() {
                       {isSelected && !el.locked && (
                         <div
                           onMouseDown={(e) => handleResizeStart(e, el)}
-                          className="absolute bottom-[-4px] right-[-4px] w-3 h-3 bg-blue-550 bg-blue-600 border border-white cursor-se-resize rounded-full z-20 hover:scale-125 transition-transform"
+                          onTouchStart={(e) => handleResizeTouchStart(e, el)}
+                          className="absolute bottom-[-4px] right-[-4px] w-3.5 h-3.5 bg-blue-600 border border-white cursor-se-resize rounded-full z-40 hover:scale-125 transition-transform"
                           id="resizer-anchor"
                         />
                       )}
@@ -1336,6 +1508,100 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* On-screen tactile arrow Nudger */}
+          {selectedElementId && (() => {
+            const activePage = getActivePage();
+            const selectedEl = activePage?.elements.find((el) => el.id === selectedElementId);
+            if (!selectedEl || selectedEl.locked) return null;
+
+            const handleNudge = (dir: "up" | "down" | "left" | "right") => {
+              let nudgeX = 0;
+              let nudgeY = 0;
+              const step = 1; // 1% step is perfect for precision clicks
+
+              if (dir === "up") nudgeY = -step;
+              if (dir === "down") nudgeY = step;
+              if (dir === "left") nudgeX = -step;
+              if (dir === "right") nudgeX = step;
+
+              let nextX = selectedEl.x + nudgeX;
+              let nextY = selectedEl.y + nudgeY;
+
+              if (snapToGrid) {
+                nextX = Math.round(nextX * 2) / 2;
+                nextY = Math.round(nextY * 2) / 2;
+              }
+
+              nextX = Math.max(0, Math.min(100 - selectedEl.width, nextX));
+              nextY = Math.max(0, Math.min(100 - selectedEl.height, nextY));
+
+              handleUpdateElement({
+                ...selectedEl,
+                x: nextX,
+                y: nextY
+              });
+            };
+
+            return (
+              <div 
+                className={`absolute ${workflowCollapsed ? "bottom-14" : "bottom-4"} right-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 p-3 rounded-2xl shadow-xl z-20 flex flex-col items-center space-y-2 text-white w-40 select-none`}
+                style={{ contentVisibility: "auto" }}
+                id="tactile-nudge-pad"
+              >
+                <div className="w-full flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800 pb-1.5 px-0.5">
+                  <span className="font-bold uppercase tracking-wider">Move Arrows</span>
+                  <span className="bg-slate-800 px-1 py-0.5 rounded text-[8px] text-slate-350 font-sans truncate max-w-16">{selectedEl.id}</span>
+                </div>
+                
+                <div className="flex flex-col items-center font-mono">
+                  {/* Up */}
+                  <button
+                    type="button"
+                    onClick={() => handleNudge("up")}
+                    className="w-10 h-10 flex items-center justify-center bg-slate-800 border border-slate-705/85 rounded-xl hover:bg-slate-700 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-200 transition-all cursor-pointer shadow"
+                    title="Move Up"
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </button>
+                  {/* Left & Right */}
+                  <div className="flex items-center space-x-4 my-1">
+                    <button
+                      type="button"
+                      onClick={() => handleNudge("left")}
+                      className="w-10 h-10 flex items-center justify-center bg-slate-800 border border-slate-705/85 rounded-xl hover:bg-slate-700 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-200 transition-all cursor-pointer shadow"
+                      title="Move Left"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="w-3 h-3 rounded-full bg-blue-500/30 border border-blue-500/50" />
+
+                    <button
+                      type="button"
+                      onClick={() => handleNudge("right")}
+                      className="w-10 h-10 flex items-center justify-center bg-slate-800 border border-slate-705/85 rounded-xl hover:bg-slate-700 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-200 transition-all cursor-pointer shadow"
+                      title="Move Right"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* Down */}
+                  <button
+                    type="button"
+                    onClick={() => handleNudge("down")}
+                    className="w-10 h-10 flex items-center justify-center bg-slate-800 border border-slate-705/85 rounded-xl hover:bg-slate-700 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-200 transition-all cursor-pointer shadow"
+                    title="Move Down"
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-[8px] text-slate-400 text-center font-sans leading-tight pt-1">
+                  Drag items, click visual arrows or use laptop keyboard arrows!
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Workflow Graph visualization bottom dock */}
           {activePage && !isMobile && (

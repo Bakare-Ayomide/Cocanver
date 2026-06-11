@@ -1,16 +1,13 @@
 {
-  "version": 2,
-  "buildCommand": "vite build",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/analyze",
-      "destination": "/api/analyze.ts"
+      "destination": "/api/analyze.js"
     },
     {
       "source": "/(.*)",
-      "destination": "/$1"
+      "destination": "/index.html"
     }
   ]
 }

@@ -97,6 +97,7 @@ export interface ElementStyles {
   borderRadius?: string;
   borderWidth?: string;
   fontSize?: string;
+  fontFamily?: string;
   opacity?: number;
   textAlign?: 'left' | 'center' | 'right';
   transparent?: boolean;
@@ -119,6 +120,7 @@ export interface CanvasElement {
   defaultValue?: string;
   imageUrl?: string;
   options?: string; // for dropdown / radios: comma-separated
+  togglePasswordTargetId?: string; // Specific linked password field to show/hide
   styles: ElementStyles;
   clickSequences: ClickSequence[]; // Multi-click sequence: Click 1, Click 2...
   conditions: ConditionRule[]; // Conditional workflows

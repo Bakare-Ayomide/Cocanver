@@ -700,6 +700,26 @@ function handleElementClick(el) {
   }
 }
 
+function getRgbaColor(hex, opacity = 1) {
+  if (!hex) return "transparent";
+  if (hex === "transparent") return "transparent";
+  if (hex.startsWith("rgb")) return hex;
+  const cleaned = hex.replace("#", "");
+  if (cleaned.length === 3) {
+    const r = parseInt(cleaned[0] + cleaned[0], 16);
+    const g = parseInt(cleaned[1] + cleaned[1], 16);
+    const b = parseInt(cleaned[2] + cleaned[2], 16);
+    return "rgba(" + r + ", " + g + ", " + b + ", " + opacity + ")";
+  }
+  if (cleaned.length === 6) {
+    const r = parseInt(cleaned.slice(0, 2), 16);
+    const g = parseInt(cleaned.slice(2, 4), 16);
+    const b = parseInt(cleaned.slice(4, 6), 16);
+    return "rgba(" + r + ", " + g + ", " + b + ", " + opacity + ")";
+  }
+  return hex;
+}
+
 function renderPage() {
   const page = DESIGN_BLUEPRINT.pages.find(p => p.id === currentPageId) || DESIGN_BLUEPRINT.pages[0];
   if (!page) return;
@@ -771,20 +791,38 @@ function renderPage() {
     const isTransparent = !!el.styles.transparent || isInvisible;
     const isNoBorder = !!el.styles.noBorder || isInvisible;
 
+    const backdropOpacity = el.styles.opacity !== undefined ? el.styles.opacity : 1;
+    const finalBgColor = isTransparent 
+      ? "transparent" 
+      : getRgbaColor(el.styles.backgroundColor || (el.type === "Button" ? "#2563eb" : "#ffffff"), backdropOpacity);
+    const finalBorderColor = isNoBorder
+      ? "none"
+      : el.styles.borderColor
+      ? "1.5px solid " + getRgbaColor(el.styles.borderColor, backdropOpacity)
+      : el.type === "Button"
+      ? "none"
+      : "1.5px solid " + getRgbaColor("#cbd5e1", backdropOpacity);
+    const elementFontFamily = el.styles.fontFamily 
+      ? el.styles.fontFamily + ", ui-sans-serif, system-ui, sans-serif"
+      : "inherit";
+    const elementFontSize = el.styles.fontSize || "inherit";
+
     if (el.type === "Button") {
       const btn = document.createElement("button");
       btn.textContent = isInvisible ? "" : (el.label || "Action");
-      btn.style.backgroundColor = isTransparent ? "transparent" : (el.styles.backgroundColor || "#2563eb");
+      btn.style.backgroundColor = finalBgColor;
       btn.style.color = isInvisible ? "transparent" : (el.styles.color || "#ffffff");
       btn.style.borderRadius = el.styles.borderRadius || "8px";
-      btn.style.border = isNoBorder ? "none" : (el.styles.borderColor ? "1.5px solid " + el.styles.borderColor : "none");
-      btn.style.opacity = isInvisible ? 0 : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      btn.style.border = finalBorderColor;
+      btn.style.fontFamily = elementFontFamily;
+      btn.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "13px";
+      btn.style.opacity = isInvisible ? "0" : "1";
       elDiv.appendChild(btn);
     } 
     else if (el.type === "Image") {
       const imgContainer = document.createElement("div");
       imgContainer.className = "canvas-element-image";
-      imgContainer.style.opacity = isInvisible ? 0 : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      imgContainer.style.opacity = backdropOpacity;
       imgContainer.style.borderRadius = el.styles.borderRadius || "8px";
       imgContainer.style.border = isNoBorder ? "none" : (el.styles.borderColor ? "1.5px solid " + el.styles.borderColor : "none");
 
@@ -816,11 +854,12 @@ function renderPage() {
       input.placeholder = isInvisible ? "" : (el.placeholder || "Enter details...");
       input.value = inputStates[el.id] || "";
       input.style.color = el.styles.color || "#1e293b";
-      input.style.fontSize = el.styles.fontSize || "13px";
-      input.style.backgroundColor = isTransparent ? "transparent" : (el.styles.backgroundColor || "#ffffff");
+      input.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "13px";
+      input.style.fontFamily = elementFontFamily;
+      input.style.backgroundColor = finalBgColor;
       input.style.borderRadius = el.styles.borderRadius || "6px";
-      input.style.border = isNoBorder ? "none" : "1.5px solid " + (el.styles.borderColor || "#cbd5e1");
-      input.style.opacity = el.styles.opacity !== undefined ? el.styles.opacity : 1;
+      input.style.border = finalBorderColor;
+      input.style.opacity = isInvisible ? "0" : "1";
 
       input.addEventListener("input", (e) => {
         inputStates[el.id] = e.target.value;
@@ -831,7 +870,7 @@ function renderPage() {
     else if (el.type === "Checkbox") {
       const container = document.createElement("div");
       container.className = "canvas-element-checkbox";
-      container.style.opacity = isInvisible ? (inputStates[el.id] ? 1 : 0) : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      container.style.opacity = isInvisible ? (inputStates[el.id] ? 1 : 0) : 1;
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
@@ -841,11 +880,20 @@ function renderPage() {
       const label = document.createElement("span");
       label.textContent = isInvisible ? "" : (el.label || "");
       label.style.color = el.styles.color || "#1e293b";
+      label.style.fontFamily = elementFontFamily;
+      label.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "12px";
 
       checkbox.addEventListener("change", (e) => {
         const isChecked = e.target.checked;
         inputStates[el.id] = isChecked;
-        if (el.label && el.label.toLowerCase().includes("show password")) {
+        
+        const targetId = el.togglePasswordTargetId ? el.togglePasswordTargetId : null;
+        if (targetId) {
+          const passDom = document.querySelector("#el-" + targetId + " input");
+          if (passDom) {
+            passDom.type = isChecked ? "text" : "password";
+          }
+        } else if (el.label && el.label.toLowerCase().includes("show password")) {
           const firstPassInput = page.elements.find(x => x.type === "Password Input");
           if (firstPassInput) {
             const passDom = document.querySelector("#el-" + firstPassInput.id + " input");
@@ -867,11 +915,12 @@ function renderPage() {
       textarea.placeholder = isInvisible ? "" : (el.placeholder || "Enter description...");
       textarea.value = inputStates[el.id] || "";
       textarea.style.color = el.styles.color || "#1e293b";
-      textarea.style.fontSize = el.styles.fontSize || "12px";
-      textarea.style.backgroundColor = isTransparent ? "transparent" : (el.styles.backgroundColor || "#ffffff");
+      textarea.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "12px";
+      textarea.style.fontFamily = elementFontFamily;
+      textarea.style.backgroundColor = finalBgColor;
       textarea.style.borderRadius = el.styles.borderRadius || "6px";
-      textarea.style.border = isNoBorder ? "none" : "1.5px solid " + (el.styles.borderColor || "#cbd5e1");
-      textarea.style.opacity = el.styles.opacity !== undefined ? el.styles.opacity : 1;
+      textarea.style.border = finalBorderColor;
+      textarea.style.opacity = isInvisible ? "0" : "1";
 
       textarea.addEventListener("input", (e) => {
         inputStates[el.id] = e.target.value;
@@ -884,7 +933,9 @@ function renderPage() {
       link.className = "canvas-element-link";
       link.textContent = isInvisible ? "" : (el.label || "Click Link");
       link.style.color = isInvisible ? "transparent" : (el.styles.color || "#3b82f6");
-      link.style.opacity = isInvisible ? 0 : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      link.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "12px";
+      link.style.fontFamily = elementFontFamily;
+      link.style.opacity = isInvisible ? "0" : "1";
       
       link.addEventListener("click", (e) => {
         e.preventDefault();
@@ -896,19 +947,22 @@ function renderPage() {
       label.className = "canvas-element-label";
       label.textContent = isInvisible ? "" : (el.label || "");
       label.style.color = isInvisible ? "transparent" : (el.styles.color || "#1e293b");
-      label.style.fontSize = el.styles.fontSize || "13px";
-      label.style.opacity = isInvisible ? 0 : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      label.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "13px";
+      label.style.fontFamily = elementFontFamily;
+      label.style.opacity = isInvisible ? "0" : "1";
       elDiv.appendChild(label);
     }
     else {
       const custom = document.createElement("div");
       custom.className = "canvas-element-custom";
       custom.textContent = isInvisible ? "" : (el.label || el.type);
-      custom.style.backgroundColor = isTransparent ? "transparent" : (el.styles.backgroundColor || "rgba(147, 51, 234, 0.15)");
+      custom.style.backgroundColor = finalBgColor;
       custom.style.color = isInvisible ? "transparent" : (el.styles.color || "#ffffff");
       custom.style.borderRadius = el.styles.borderRadius || "4px";
-      custom.style.border = isNoBorder ? "none" : (el.styles.borderColor ? "1.5px solid " + el.styles.borderColor : "none");
-      custom.style.opacity = isInvisible ? 0 : (el.styles.opacity !== undefined ? el.styles.opacity : 1);
+      custom.style.border = finalBorderColor;
+      custom.style.fontFamily = elementFontFamily;
+      custom.style.fontSize = elementFontSize !== "inherit" ? elementFontSize : "11px";
+      custom.style.opacity = isInvisible ? "0" : "1";
       elDiv.appendChild(custom);
     }
 

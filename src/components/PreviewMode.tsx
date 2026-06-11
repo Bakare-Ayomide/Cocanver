@@ -3,6 +3,26 @@ import { Project, Page, CanvasElement, Action, ConditionRule } from "../types";
 import { X, ArrowLeft, Play, RefreshCw, Send, AlertCircle, FileSpreadsheet, CheckCircle, Bell, ExternalLink, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+const getRgbaColor = (hex: string | undefined, opacity: number = 1): string => {
+  if (!hex) return "transparent";
+  if (hex === "transparent") return "transparent";
+  if (hex.startsWith("rgb")) return hex;
+  const cleaned = hex.replace("#", "");
+  if (cleaned.length === 3) {
+    const r = parseInt(cleaned[0] + cleaned[0], 16);
+    const g = parseInt(cleaned[1] + cleaned[1], 16);
+    const b = parseInt(cleaned[2] + cleaned[2], 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  if (cleaned.length === 6) {
+    const r = parseInt(cleaned.slice(0, 2), 16);
+    const g = parseInt(cleaned.slice(2, 4), 16);
+    const b = parseInt(cleaned.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  return hex;
+};
+
 interface PreviewModeProps {
   project: Project;
   onClose: () => void;
@@ -444,163 +464,216 @@ export default function PreviewMode({ project, onClose }: PreviewModeProps) {
                     id={`preview-el-${el.id}`}
                   >
                     {/* Render visual content depending on element.type */}
-                    {el.type === "Image" && (
-                      <div className="w-full h-full relative overflow-hidden flex items-center justify-center rounded" style={{
-                        opacity: el.styles.opacity !== undefined ? el.styles.opacity : 1,
-                        borderRadius: el.styles.borderRadius || "8px",
-                        border: hasNoBorder ? "none" : el.styles.borderColor ? `1.5px solid ${el.styles.borderColor}` : "none",
-                      }}>
-                        {el.imageUrl ? (
-                          <img
-                            src={el.imageUrl}
-                            alt={el.label || el.id}
-                            className="w-full h-full object-fill select-none pointer-events-none"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-mono italic">No Image URL</span>
-                        )}
-                      </div>
-                    )}
+                    {(() => {
+                      const backdropOpacity = el.styles.opacity !== undefined ? el.styles.opacity : 1;
+                      const finalBgColor = isTransparent 
+                        ? "transparent" 
+                        : getRgbaColor(el.styles.backgroundColor || (el.type === "Button" ? "#2563eb" : "#ffffff"), backdropOpacity);
+                      const finalBorderColor = hasNoBorder
+                        ? "none"
+                        : el.styles.borderColor
+                        ? `1.5px solid ${getRgbaColor(el.styles.borderColor, backdropOpacity)}`
+                        : el.type === "Button"
+                        ? "none"
+                        : `1.5px solid ${getRgbaColor("#cbd5e1", backdropOpacity)}`;
+                      const elementFontFamily = el.styles.fontFamily 
+                        ? `${el.styles.fontFamily}, ui-sans-serif, system-ui, sans-serif`
+                        : "inherit";
+                      const elementFontSize = el.styles.fontSize || "inherit";
 
-                    {el.type === "Button" && (
-                      <button
-                        style={{
-                          backgroundColor: isTransparent ? "transparent" : el.styles.backgroundColor || "#2563eb",
-                          color: isInvisible ? "transparent" : el.styles.color || "#ffffff",
-                          borderRadius: el.styles.borderRadius || "8px",
-                          width: "100%",
-                          height: "100%",
-                          fontSize: el.styles.fontSize || "13px",
-                          border: hasNoBorder ? "none" : el.styles.borderColor ? `1.5px solid ${el.styles.borderColor}` : "none",
-                          opacity: isInvisible ? 0 : el.styles.opacity !== undefined ? el.styles.opacity : 1,
-                        }}
-                        className="font-semibold text-center cursor-pointer hover:brightness-110 active:scale-95 transition"
-                      >
-                        {isInvisible ? "" : el.label || "Click Button"}
-                      </button>
-                    )}
+                      if (el.type === "Image") {
+                        return (
+                          <div className="w-full h-full relative overflow-hidden flex items-center justify-center rounded" style={{
+                            opacity: backdropOpacity,
+                            borderRadius: el.styles.borderRadius || "8px",
+                            border: hasNoBorder ? "none" : el.styles.borderColor ? `1.5px solid ${el.styles.borderColor}` : "none",
+                          }}>
+                            {el.imageUrl ? (
+                              <img
+                                src={el.imageUrl}
+                                alt={el.label || el.id}
+                                className="w-full h-full object-fill select-none pointer-events-none"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-mono italic">No Image URL</span>
+                            )}
+                          </div>
+                        );
+                      }
 
-                    {["Text Input", "Email Input", "Password Input", "Phone Input", "Number Input"].includes(el.type) && (
-                      <input
-                        type={
-                          el.type === "Password Input"
-                            ? (unmaskedInputs[el.id] ? "text" : "password")
-                            : el.type === "Number Input"
-                            ? "number"
-                            : "text"
-                        }
-                        placeholder={isInvisible ? "" : el.placeholder || "Insert values..."}
-                        value={(inputStates[el.id] as string) || ""}
-                        onChange={(e) => handleFormValueChange(el.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()} // Stop bubbling
-                        style={{
-                          color: el.styles.color || "#1e293b",
-                          fontSize: el.styles.fontSize || "13px",
-                          backgroundColor: isTransparent ? "transparent" : el.styles.backgroundColor || "#ffffff",
-                          borderRadius: el.styles.borderRadius || "6px",
-                          border: hasNoBorder ? "none" : `1.5px solid ${el.styles.borderColor || "#cbd5e1"}`,
-                          width: "100%",
-                          height: "100%",
-                          opacity: el.styles.opacity !== undefined ? el.styles.opacity : 1,
-                        }}
-                        className="px-3 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                      />
-                    )}
+                      if (el.type === "Button") {
+                        return (
+                          <button
+                            style={{
+                              backgroundColor: finalBgColor,
+                              color: isInvisible ? "transparent" : el.styles.color || "#ffffff",
+                              borderRadius: el.styles.borderRadius || "8px",
+                              width: "100%",
+                              height: "100%",
+                              fontSize: elementFontSize !== "inherit" ? elementFontSize : "13px",
+                              fontFamily: elementFontFamily,
+                              border: finalBorderColor,
+                              opacity: isInvisible ? 0 : 1,
+                            }}
+                            className="font-semibold text-center cursor-pointer hover:brightness-110 active:scale-95 transition"
+                          >
+                            {isInvisible ? "" : el.label || "Click Button"}
+                          </button>
+                        );
+                      }
 
-                    {el.type === "Checkbox" && (
-                      <div 
-                        className="flex items-center space-x-2 w-full h-full px-2"
-                        style={{ opacity: isInvisible ? (inputStates[el.id] ? 1 : 0) : el.styles.opacity !== undefined ? el.styles.opacity : 1 }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!inputStates[el.id]}
-                          onChange={(e) => {
-                            const isChecked = e.target.checked;
-                            handleFormValueChange(el.id, isChecked);
-                            if (el.label && el.label.toLowerCase().includes("show password")) {
-                              const firstPassInput = currentPage?.elements.find(x => x.type === "Password Input");
-                              if (firstPassInput) {
-                                setUnmaskedInputs(prev => ({
-                                  ...prev,
-                                  [firstPassInput.id]: isChecked
-                                }));
-                              }
+                      if (["Text Input", "Email Input", "Password Input", "Phone Input", "Number Input"].includes(el.type)) {
+                        return (
+                          <input
+                            type={
+                              el.type === "Password Input"
+                                ? (unmaskedInputs[el.id] ? "text" : "password")
+                                : el.type === "Number Input"
+                                ? "number"
+                                : "text"
                             }
+                            placeholder={isInvisible ? "" : el.placeholder || "Insert values..."}
+                            value={(inputStates[el.id] as string) || ""}
+                            onChange={(e) => handleFormValueChange(el.id, e.target.value)}
+                            onClick={(e) => e.stopPropagation()} // Stop bubbling
+                            style={{
+                              color: el.styles.color || "#1e293b",
+                              fontSize: elementFontSize !== "inherit" ? elementFontSize : "13px",
+                              fontFamily: elementFontFamily,
+                              backgroundColor: finalBgColor,
+                              borderRadius: el.styles.borderRadius || "6px",
+                              border: finalBorderColor,
+                              width: "100%",
+                              height: "100%",
+                              opacity: isInvisible ? 0 : 1,
+                            }}
+                            className="px-3 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          />
+                        );
+                      }
+
+                      if (el.type === "Checkbox") {
+                        return (
+                          <div 
+                            className="flex items-center space-x-2 w-full h-full px-2"
+                            style={{ opacity: isInvisible ? (inputStates[el.id] ? 1 : 0) : 1 }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!inputStates[el.id]}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                handleFormValueChange(el.id, isChecked);
+                                if (el.togglePasswordTargetId) {
+                                  setUnmaskedInputs(prev => ({
+                                    ...prev,
+                                    [el.togglePasswordTargetId!]: isChecked
+                                  }));
+                                } else if (el.label && el.label.toLowerCase().includes("show password")) {
+                                  const firstPassInput = currentPage?.elements.find(x => x.type === "Password Input");
+                                  if (firstPassInput) {
+                                    setUnmaskedInputs(prev => ({
+                                      ...prev,
+                                      [firstPassInput.id]: isChecked
+                                    }));
+                                  }
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                            />
+                            <span 
+                              className="text-xs font-semibold text-slate-850" 
+                              style={{ 
+                                color: isInvisible ? "transparent" : el.styles.color || "#1e293b",
+                                fontFamily: elementFontFamily,
+                                fontSize: elementFontSize !== "inherit" ? elementFontSize : "12px",
+                              }}
+                            >
+                              {isInvisible ? "" : el.label}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (el.type === "Text Area") {
+                        return (
+                          <textarea
+                            placeholder={isInvisible ? "" : el.placeholder || "Enter details..."}
+                            value={(inputStates[el.id] as string) || ""}
+                            onChange={(e) => handleFormValueChange(el.id, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              color: el.styles.color || "#1e293b",
+                              fontSize: elementFontSize !== "inherit" ? elementFontSize : "12px",
+                              fontFamily: elementFontFamily,
+                              backgroundColor: finalBgColor,
+                              borderRadius: el.styles.borderRadius || "6px",
+                              border: finalBorderColor,
+                              width: "100%",
+                              height: "100%",
+                              opacity: isInvisible ? 0 : 1,
+                            }}
+                            className="p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium"
+                          />
+                        );
+                      }
+
+                      if (el.type === "Link") {
+                        return (
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                            }}
+                            style={{ 
+                              color: isInvisible ? "transparent" : el.styles.color || "#3b82f6",
+                              opacity: isInvisible ? 0 : 1,
+                              fontFamily: elementFontFamily,
+                              fontSize: elementFontSize !== "inherit" ? elementFontSize : "12px",
+                            }}
+                            className="text-xs font-semibold underline decoration-2 hover:opacity-80 flex items-center justify-center w-full text-center"
+                          >
+                            {isInvisible ? "" : el.label || "Click Link"}
+                          </a>
+                        );
+                      }
+
+                      if (el.type === "Label") {
+                        return (
+                          <div
+                            style={{ 
+                              color: isInvisible ? "transparent" : el.styles.color || "#1e293b", 
+                              fontSize: elementFontSize !== "inherit" ? elementFontSize : "13px",
+                              fontFamily: elementFontFamily,
+                              opacity: isInvisible ? 0 : 1, 
+                            }}
+                            className="font-bold w-full text-center truncate"
+                          >
+                            {isInvisible ? "" : el.label}
+                          </div>
+                        );
+                      }
+
+                      // Default catch-all
+                      return (
+                        <div
+                          style={{
+                            backgroundColor: finalBgColor,
+                            color: isInvisible ? "transparent" : el.styles.color || "#ffffff",
+                            borderRadius: el.styles.borderRadius || "4px",
+                            fontSize: elementFontSize !== "inherit" ? elementFontSize : "11px",
+                            fontFamily: elementFontFamily,
+                            border: finalBorderColor,
+                            opacity: isInvisible ? 0 : 1,
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
-                        />
-                        <span className="text-xs font-semibold text-slate-850" style={{ color: isInvisible ? "transparent" : el.styles.color || "#1e293b" }}>{isInvisible ? "" : el.label}</span>
-                      </div>
-                    )}
-
-                    {el.type === "Text Area" && (
-                      <textarea
-                        placeholder={isInvisible ? "" : el.placeholder || "Enter details..."}
-                        value={(inputStates[el.id] as string) || ""}
-                        onChange={(e) => handleFormValueChange(el.id, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          color: el.styles.color || "#1e293b",
-                          fontSize: el.styles.fontSize || "12px",
-                          backgroundColor: isTransparent ? "transparent" : el.styles.backgroundColor || "#ffffff",
-                          borderRadius: el.styles.borderRadius || "6px",
-                          border: hasNoBorder ? "none" : `1.5px solid ${el.styles.borderColor || "#cbd5e1"}`,
-                          width: "100%",
-                          height: "100%",
-                          opacity: el.styles.opacity !== undefined ? el.styles.opacity : 1,
-                        }}
-                        className="p-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium"
-                      />
-                    )}
-
-                    {el.type === "Link" && (
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                        }}
-                        style={{ 
-                          color: isInvisible ? "transparent" : el.styles.color || "#3b82f6",
-                          opacity: isInvisible ? 0 : el.styles.opacity !== undefined ? el.styles.opacity : 1 
-                        }}
-                        className="text-xs font-semibold underline decoration-2 hover:opacity-80 flex items-center justify-center w-full text-center"
-                      >
-                        {isInvisible ? "" : el.label || "Click Link"}
-                      </a>
-                    )}
-
-                    {el.type === "Label" && (
-                      <div
-                        style={{ 
-                          color: isInvisible ? "transparent" : el.styles.color || "#1e293b", 
-                          fontSize: el.styles.fontSize || "13px",
-                          opacity: isInvisible ? 0 : el.styles.opacity !== undefined ? el.styles.opacity : 1 
-                        }}
-                        className="font-bold w-full text-center truncate"
-                      >
-                        {isInvisible ? "" : el.label}
-                      </div>
-                    )}
-
-                    {/* Default catch region for empty background elements */}
-                    {!["Button", "Text Input", "Email Input", "Password Input", "Phone Input", "Number Input", "Checkbox", "Text Area", "Link", "Label"].includes(el.type) && (
-                      <div
-                        style={{
-                          backgroundColor: isTransparent ? "transparent" : el.styles.backgroundColor || "rgba(59, 130, 246, 0.15)",
-                          color: isInvisible ? "transparent" : el.styles.color || "#ffffff",
-                          borderRadius: el.styles.borderRadius || "4px",
-                          fontSize: "11px",
-                          border: hasNoBorder ? "none" : el.styles.borderColor ? `1.5px solid ${el.styles.borderColor}` : "none",
-                          opacity: isInvisible ? 0 : el.styles.opacity !== undefined ? el.styles.opacity : 1,
-                        }}
-                        className="w-full h-full flex items-center justify-center font-medium font-mono text-center tracking-tight opacity-90 truncate p-1"
-                      >
-                        {isInvisible ? "" : el.label || el.type}
-                      </div>
-                    )}
+                          className="w-full h-full flex items-center justify-center font-medium font-mono text-center tracking-tight opacity-90 truncate p-1"
+                        >
+                          {isInvisible ? "" : el.label || el.type}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

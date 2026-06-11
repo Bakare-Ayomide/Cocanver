@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CanvasElement, Page, Action, ActionType, ConditionRule } from "../types";
-import { Settings, MousePointerClick, ShieldAlert, Plus, Trash2, ArrowRight, Eye, ShieldCheck, Layers, EyeOff, Lock, Unlock } from "lucide-react";
+import { Settings, MousePointerClick, ShieldAlert, Plus, Trash2, ArrowRight, ArrowUp, ArrowDown, ArrowLeft, Eye, ShieldCheck, Layers, EyeOff, Lock, Unlock } from "lucide-react";
 
 interface PropertyEditorProps {
   element: CanvasElement;
@@ -409,6 +409,30 @@ export default function PropertyEditor({
               </div>
             )}
 
+            {/* If Checkbox link exists */}
+            {element.type === "Checkbox" && (
+              <div className="space-y-1.5 border-t border-slate-800/60 pt-3">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Show Password Functional Link</label>
+                <select
+                  value={element.togglePasswordTargetId || ""}
+                  onChange={(e) => onUpdateElement({ ...element, togglePasswordTargetId: e.target.value || undefined })}
+                  className="w-full bg-slate-950 text-xs border border-slate-800 rounded-lg h-8 px-2 text-slate-200 outline-none focus:border-blue-500 font-mono"
+                >
+                  <option value="">-- Standard Checkbox --</option>
+                  {allElements
+                    .filter((el) => ["Password Input", "Text Input", "Email Input"].includes(el.type))
+                    .map((el) => (
+                      <option key={el.id} value={el.id}>
+                        Toggle visibility of ID: {el.id} ({el.type})
+                      </option>
+                    ))}
+                </select>
+                <p className="text-[9px] text-slate-500">
+                  Choose a password input selector. Checking this checkbox will automatically unmask/reveal password contents on that target field.
+                </p>
+              </div>
+            )}
+
             {/* Layer Level */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-400 tracking-wider flex items-center justify-between">
@@ -515,6 +539,48 @@ export default function PropertyEditor({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2 border-t border-slate-800/40 pt-2.5">
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400">Font Size (Sizing)</span>
+                  <select
+                    value={element.styles.fontSize || "13px"}
+                    onChange={(e) => handleStyleChange("fontSize", e.target.value)}
+                    className="w-full bg-slate-950 text-xs border border-slate-800 rounded h-7 px-1 text-slate-200 outline-none"
+                  >
+                    <option value="9px">9px (Micro)</option>
+                    <option value="10px">10px (Very Small)</option>
+                    <option value="11px">11px (Compact)</option>
+                    <option value="12px">12px (Small)</option>
+                    <option value="13px">13px (Regular)</option>
+                    <option value="14px">14px (Normal)</option>
+                    <option value="15px">15px (Medium)</option>
+                    <option value="16px">16px (Lead)</option>
+                    <option value="18px">18px (Pre-Title)</option>
+                    <option value="20px">20px (Title SM)</option>
+                    <option value="24px">24px (Title MD)</option>
+                    <option value="28px">28px (Title LG)</option>
+                    <option value="32px">32px (Header SM)</option>
+                    <option value="36px">36px (Header LG)</option>
+                    <option value="42px">42px (Display)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400">Font Face (Family)</span>
+                  <select
+                    value={element.styles.fontFamily || "Inter"}
+                    onChange={(e) => handleStyleChange("fontFamily", e.target.value)}
+                    className="w-full bg-slate-950 text-xs border border-slate-800 rounded h-7 px-1 text-slate-200 outline-none"
+                  >
+                    <option value="Inter">Inter (Clean Sans)</option>
+                    <option value="Space Grotesk">Space Grotesk (Tech)</option>
+                    <option value="Playfair Display">Playfair (Serif)</option>
+                    <option value="JetBrains Mono">JetBrains (Mono)</option>
+                    <option value="system-ui">System Default</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Exact Geometry Adjuster */}
               <div className="space-y-2 border-t border-slate-800/85 pt-3">
                 <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block font-mono">Precision Geometry</span>
@@ -562,6 +628,56 @@ export default function PropertyEditor({
                       onChange={(e) => onUpdateElement({ ...element, y: Math.max(0, Math.min(100, Number(e.target.value))) })}
                       className="w-full bg-slate-950 border border-slate-800 rounded h-7 px-1.5 text-xs text-slate-100 outline-none focus:border-blue-500 font-mono"
                     />
+                  </div>
+                </div>
+
+                {/* Tactile nudging arrow buttons */}
+                <div className="mt-3 bg-slate-950 p-2.5 rounded-lg border border-slate-800/70 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] uppercase font-bold text-slate-500 font-mono tracking-wider">Move Element Nudger</span>
+                    <span className="text-[8px] text-slate-500 font-mono">Steps of 1%</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    {/* Up */}
+                    <button
+                      type="button"
+                      onClick={() => onUpdateElement({ ...element, y: Math.max(0, element.y - 1) })}
+                      className="w-8 h-8 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-300 transition-all cursor-pointer"
+                      title="Move Up"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </button>
+                    {/* Left & Right */}
+                    <div className="flex items-center space-x-6 my-1">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateElement({ ...element, x: Math.max(0, element.x - 1) })}
+                        className="w-8 h-8 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-300 transition-all cursor-pointer"
+                        title="Move Left"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                      
+                      <div className="w-4 h-4 rounded-full bg-slate-800 border border-slate-700/65" />
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateElement({ ...element, x: Math.min(100 - element.width, element.x + 1) })}
+                        className="w-8 h-8 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-300 transition-all cursor-pointer"
+                        title="Move Right"
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {/* Down */}
+                    <button
+                      type="button"
+                      onClick={() => onUpdateElement({ ...element, y: Math.min(100 - element.height, element.y + 1) })}
+                      className="w-8 h-8 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 active:bg-blue-600 hover:scale-105 active:scale-95 text-slate-300 transition-all cursor-pointer"
+                      title="Move Down"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
